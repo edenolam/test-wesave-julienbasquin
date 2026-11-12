@@ -2,15 +2,17 @@
 
 ## Besoin et hypothèses
 
-Consigne reçue : « modélisation API gestion de portefeuille avec Ruby on Rails ».
-Le contexte de candidature conduit à retenir des portefeuilles d’investissement.
-Ce périmètre constitue une proposition du candidat, et non une spécification de WeSave.
+La consigne est ouverte : « modélisation API gestion de portefeuille avec Ruby on Rails ».
+Le projet retient des portefeuilles d’investissement, en lien avec l’activité de
+WeSave. Cette interprétation reste à confirmer avec l’entreprise.
 
-La première version métier cible des investissements en EUR, sans vente à découvert,
-sans frais ni fiscalité, sans import de cours externes. Les cours sont renseignés
-manuellement. L’objectif est de démontrer une API cohérente et testable.
+Cette version gère des investissements en EUR. Elle permet d’enregistrer des
+achats et des ventes, de consulter les quantités détenues et de calculer leur
+valeur à une date donnée. Les frais, la fiscalité et les ventes à découvert ne
+sont pas pris en charge. Les cours de démonstration sont fictifs, sans connexion
+à un fournisseur de données financières.
 
-## Modèles implémentés
+## Modèles
 
 | Modèle | Attributs principaux | Relations |
 | --- | --- | --- |
@@ -30,20 +32,26 @@ erDiagram
     ASSET ||--o{ PRICE : has
 ```
 
-`Trade` évite le nom `Transaction`, déjà employé par Active Record.
-Les positions sont calculées ; aucune table Position ne duplique les quantités.
-La trésorerie existante (`Wallet`, `Operation`) est un prototype distinct : son
-intégration à un portefeuille sera explicite si les achats doivent débiter un solde.
-Elle ne doit pas être assimilée à la valeur des investissements.
+`Trade` désigne un achat ou une vente. Ce nom évite la confusion avec les
+transactions de base de données utilisées par Active Record.
 
-## Règles métier
+Les positions sont calculées depuis les achats et ventes. Par exemple, un achat
+de 10 parts suivi d’une vente de 3 parts donne une position de 7 parts. Une table
+supplémentaire de positions obligerait à maintenir ces deux sources en cohérence.
+
+La gestion des espèces est hors périmètre : enregistrer un achat ne débite pas
+un compte bancaire.
+
+## Calculs et règles métier
 
 - Une position = somme des quantités achetées moins somme des quantités vendues.
 - Une vente ne peut dépasser la quantité disponible à sa date d’exécution.
-- Les opérations antidatées doivent aussi préserver les positions futures :
-  valider la chronologie complète de l’actif dans le portefeuille.
-- Une écriture de trade verrouille le portefeuille et valide les quantités dans
-  la même transaction SQL, afin de sérialiser les achats et ventes concurrents.
+- Un achat ou une vente antidaté ne doit pas rendre une position négative à un
+  autre moment de l’historique. La validation parcourt donc toute la chronologie
+  de l’actif dans le portefeuille.
+- Le portefeuille est verrouillé pendant l’enregistrement, avec une nouvelle
+  validation sous verrou. Par exemple, si deux requêtes vendent chacune 7 parts
+  alors que le portefeuille en contient 10, une seule doit être acceptée.
 - Quantité : decimal(24, 8). Prix unitaire et cours : decimal(24, 8).
   Valeur affichée : arrondie à deux décimales à la fin du calcul.
 - Quantité, prix unitaire et cours sont strictement positifs et finis.
@@ -73,27 +81,43 @@ Elle ne doit pas être assimilée à la valeur des investissements.
 | GET | /api/v1/assets | Catalogue paginé |
 | GET | /api/v1/assets/:id/prices | Historique des cours |
 
-Le catalogue et les cours sont alimentés par seeds pour la démonstration ;
-aucune écriture publique n’est nécessaire sur ces ressources.
-Les listes sont bornées et paginées. Les décimaux sont sérialisés en chaînes.
+Le catalogue et les cours sont chargés avec `make seed`. Ils sont consultables
+par l’API, mais leur modification n’est pas exposée.
+Les listes de portefeuilles, d’opérations, d’actifs et de cours sont limitées à
+50 résultats par requête, avec un paramètre `offset`. La liste des positions est
+complète. Les montants et quantités sont renvoyés sous forme de chaînes décimales.
 Les créations renvoient 201 ; les erreurs de validation 422 ; l’absence de
 connexion 401. Une ressource absente ou appartenant à un autre utilisateur
 renvoie 404. Les paramètres manquants ou mal formés renvoient 400.
 
-## Vérifications automatisées
+## Authentification et accès
 
-Tests de requêtes pour l’authentification et l’isolation des utilisateurs ;
-achat puis vente partielle ; rejet d’une vente excessive ; précision décimale ;
-rejet des valeurs invalides ; chronologie des trades ; valorisation historique ;
-cours absent ; test concurrent avec deux ventes dépassant ensemble la position.
-Contraintes SQL : clés étrangères, NOT NULL, index uniques et CHECK sur les
-montants positifs et le sens des trades.
+La connexion fournit un jeton Bearer aléatoire, valable 24 heures. La base ne
+conserve que son empreinte SHA-256 ; la déconnexion supprime la session.
+Les mots de passe sont hachés avec bcrypt.
 
-## État de l’implémentation
+Chaque accès à un portefeuille passe par les portefeuilles de l’utilisateur
+connecté. Un identifiant appartenant à un autre utilisateur renvoie donc 404,
+même s’il existe en base.
 
-Rails API, Docker Compose, PostgreSQL et Makefile sont disponibles.
-Les modèles et routes d’investissement décrits ici sont implémentés et testés.
-Le prototype de trésorerie ne dispose plus de routes publiques ; ses tables sont
-conservées pour préserver les éventuelles données locales existantes.
-Les sessions utilisent des jetons Bearer aléatoires valables 24 heures ; seule
-leur empreinte SHA-256 est stockée. La déconnexion révoque le jeton.
+L’environnement Docker fourni sert à la démonstration locale. Les limites de
+sécurité avant une mise en production sont détaillées dans le [README](../README.md).
+
+## Tests et contraintes de base de données
+
+Les tests couvrent la connexion, l’expiration et la révocation des sessions,
+l’accès aux portefeuilles d’un autre utilisateur, les achats et ventes, les
+montants invalides et la valorisation historique. Un test lance deux ventes
+concurrentes pour vérifier qu’elles ne peuvent pas dépasser la position disponible.
+
+Les clés étrangères, les champs obligatoires, les index uniques et les contraintes
+SQL sur les valeurs positives complètent les validations Rails.
+
+Pour lancer les vérifications :
+
+```sh
+make check
+```
+
+Le [README](../README.md) décrit le démarrage, le compte de démonstration et un
+parcours de test dans Swagger.
