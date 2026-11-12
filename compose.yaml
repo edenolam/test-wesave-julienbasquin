@@ -13,6 +13,12 @@ services:
       retries: 10
   api:
     build: .
+    healthcheck:
+      test: ["CMD", "ruby", "-rnet/http", "-e", "exit(Net::HTTP.get_response(URI('http://127.0.0.1:3000/up')).code == '200' ? 0 : 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     ports:
       - "127.0.0.1:3000:3000"
     environment:

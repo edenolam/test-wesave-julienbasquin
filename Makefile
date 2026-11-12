@@ -7,16 +7,18 @@ TEST_DATABASE_URL := postgres://portfolio:development@db/portfolio_test
 help: ## Afficher les commandes disponibles
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  make %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-setup: ## Construire, préparer la base et démarrer le projet
+setup: ## Installer et démarrer la démonstration complète
 	$(MAKE) build
 	$(MAKE) db-prepare
+	$(MAKE) seed
 	$(MAKE) up
+	@echo "Prêt : http://localhost:3000/docs/index.html — connexion : demo@example.test / Demonstration-12345!"
 
 build: ## Construire l'image Rails
 	$(COMPOSE) build
 
 up: ## Démarrer les services en arrière-plan
-	$(COMPOSE) up -d
+	$(COMPOSE) up -d --wait --wait-timeout 120
 
 down: ## Arrêter les services en conservant les données
 	$(COMPOSE) down

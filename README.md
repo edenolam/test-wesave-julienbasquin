@@ -1,9 +1,8 @@
 # API de portefeuilles d’investissement
 
-Projet de candidature réalisé en Ruby on Rails, en réponse à la consigne
-« modélisation API gestion de portefeuille ». Le portefeuille d’investissement
-est une hypothèse métier du candidat ; ce périmètre n’est pas une spécification
-validée par WeSave.
+Ce projet répond à la consigne « modélisation API gestion de portefeuille avec
+Ruby on Rails ». La consigne étant ouverte, le périmètre retenu est celui des
+portefeuilles d’investissement, en lien avec l’activité de WeSave.
 
 L’API permet de créer des portefeuilles privés, enregistrer des achats et ventes,
 consulter les positions et calculer une valorisation historique.
@@ -12,25 +11,40 @@ client n’est inclus.**
 
 Ruby 3.3 · Rails 8.1 API · PostgreSQL 17 · Docker Compose · Minitest.
 
-## 1. Démarrer après extraction du ZIP
+## 1. Démarrer le projet
 
-Prérequis : Docker démarré, Docker Compose v2 ou supérieur, GNU Make et port 3000
-libre. Ouvrir un terminal dans le dossier contenant `Makefile` et `compose.yaml`.
-Aucune installation locale de Ruby ou PostgreSQL, aucun compte Heroku ou
-Hostinger et aucun fichier de secrets à demander pour cette démonstration.
+Prérequis : **Docker démarré**, **Docker Compose 2.20 ou supérieur**, **GNU Make**
+et le **port 3000 libre**. Ruby et PostgreSQL sont exécutés dans Docker.
+Un accès Internet est nécessaire pour télécharger les dépendances et afficher Swagger.
+
+Cloner le dépôt :
 
 ```sh
+git clone https://github.com/edenolam/test-wesave-julienbasquin.git
+cd test-wesave-julienbasquin
 make setup
-make seed
 ```
 
-Le premier démarrage télécharge les images et les dépendances : un accès Internet
-est nécessaire. Ouvrir ensuite :
+Avec un ZIP, extraire l’archive, ouvrir un terminal dans le dossier contenant
+`Makefile` et `compose.yaml`, puis lancer uniquement `make setup`.
+
+Cette commande construit l’image, prépare PostgreSQL, charge les données fictives
+et attend que Rails soit disponible. Lorsqu’elle affiche **Prêt**, ouvrir :
 
 **http://localhost:3000/docs/index.html**
 
-Si Rails est encore en cours de démarrage, patienter quelques secondes puis
-recharger. `http://localhost:3000/up` doit répondre avec une page verte.
+Aucun fichier de configuration ni secret à fournir pour cette démonstration.
+Le compte et les données ci-dessous sont créés automatiquement. Les commandes
+peuvent être relancées sans effacer les données existantes.
+
+Pour vérifier le fonctionnement sans manipuler Swagger :
+
+```sh
+make demo
+```
+
+Le résultat doit se terminer par **« Démonstration HTTP réussie »**. Cette commande
+crée des données supplémentaires et reste indépendante de la connexion Swagger.
 
 ## 2. Se connecter dans Swagger
 
@@ -51,7 +65,8 @@ supplémentaire n’est nécessaire pour examiner les portefeuilles de démonstr
 
 3. Cliquer **Execute** : la section **Server response** doit afficher **201**.
 4. Copier la valeur de `token` depuis **Response body**, sans les guillemets.
-5. Cliquer **Authorize** en haut de la page, coller uniquement le jeton,
+5. Cliquer **Authorize** en haut de la page, coller uniquement le jeton
+   (sans le préfixe `Bearer`),
    valider avec **Authorize**, puis fermer avec **Close**.
 
 Le jeton expire après 24 heures et n’est pas conservé au rechargement de Swagger.
@@ -64,7 +79,7 @@ Pour chaque étape, utiliser **Try it out**, remplir les paramètres puis **Exec
 
 | Étape | Endpoint | Paramètres et résultat attendu |
 | --- | --- | --- |
-| Lister les portefeuilles | GET /api/v1/portfolios | `offset = 0` : trois portefeuilles, réponse 200 |
+| Lister les portefeuilles | GET /api/v1/portfolios | `offset = 0` : trois portefeuilles préparés, réponse 200 |
 | Voir les quantités détenues | GET /api/v1/portfolios/{id}/positions | Utiliser un `id` obtenu à l’étape précédente : liste des positions |
 | Calculer leur valeur | GET /api/v1/portfolios/{id}/valuation | Même `id`, laisser la date vide : `value` en EUR, `missing_asset_ids: []` |
 | Voir les opérations | GET /api/v1/portfolios/{portfolio_id}/trades | Même identifiant, `offset = 0` : six achats/ventes par portefeuille initial |
@@ -77,7 +92,7 @@ Une liste vide avec le code 200 est un succès, sans résultat pour cette page
 ou ce compte. Un compte nouvellement créé ne possède pas les portefeuilles du
 compte de démonstration.
 
-Les données comprennent trois profils (Épargne diversifiée, Profil prudent,
+Sur une installation neuve, les données comprennent trois profils (Épargne diversifiée, Profil prudent,
 Profil dynamique), 18 achats/ventes et 91 jours calendaires de cours pour huit
 actifs (ETF, actions, obligation et fonds). Les valeurs sont entièrement fictives.
 `make seed` peut être relancé : il conserve les données existantes sans dupliquer
@@ -97,8 +112,7 @@ make check      # Tests, style, Brakeman et audit des dépendances
 ```
 
 La démonstration crée un utilisateur unique, un portefeuille et un achat,
-affiche les positions et la valorisation, puis révoque sa session. Elle se termine
-par « Démonstration HTTP réussie ». Elle ne connecte pas automatiquement Swagger.
+affiche les positions et la valorisation, puis révoque sa session.
 
 ```sh
 make test       # Tests dans une base séparée
@@ -128,7 +142,6 @@ make up         # Les redémarrer
 
 ## 6. Fonctionnalités et choix métier
 
-
 - Inscription, connexion et déconnexion ; sessions Bearer expirant après 24 heures.
 - Portefeuilles privés : toutes les consultations et écritures vérifient le propriétaire.
 - Catalogue d’actifs et historique des cours, alimentés via `make seed` ou la console.
@@ -143,7 +156,8 @@ make up         # Les redémarrer
 Hypothèses : EUR uniquement, sans frais, fiscalité, dividendes, gestion des espèces
 ou calcul de performance. Un achat enregistre un investissement ; il ne débite
 pas un compte bancaire. Les cours de démonstration ne sont pas des cours réels.
-L’ancien prototype de trésorerie n’est plus exposé par les routes.
+Les modèles `Wallet` et `Operation` proviennent d’un prototype de trésorerie ;
+leurs tables sont conservées, mais aucune route de l’API ne les expose.
 
 Le [document de modélisation](docs/modelisation.md) contient les relations,
 les règles métier, le contrat HTTP et les arbitrages.
@@ -166,6 +180,7 @@ sont des chaînes décimales. Les erreurs suivent `{"errors":["message"]}`.
 | 429 | Trop de connexions ; attendre avant de réessayer |
 | GET /api/v1/users ne fonctionne pas | L’inscription est un POST à tester dans Swagger |
 | `value: null` | Un cours nécessaire manque ; consulter `missing_asset_ids` |
+| Le serveur ne répond pas | Vérifier `make status` et `make logs` ; `/up` contrôle le démarrage de Rails, sans tester PostgreSQL |
 | Swagger ne charge pas | Vérifier Internet : ses scripts viennent d’un CDN à version fixée |
 | Port 3000 occupé | Libérer le port avant `make up` |
 | Impossible de joindre Docker | Démarrer Docker et vérifier les permissions du socket |
@@ -173,7 +188,6 @@ sont des chaînes décimales. Les erreurs suivent `{"errors":["message"]}`.
 Les requêtes exécutées dans Swagger modifient réellement la base locale.
 
 ## 8. Sécurité et limites de livraison
-
 
 Les tests couvrent l’isolation des utilisateurs, l’expiration/révocation des
 sessions, les validations, les ventes excessives et antidatées, la concurrence,
