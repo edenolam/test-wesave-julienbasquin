@@ -1,0 +1,13 @@
+/.idea/
+/.agents/
+/.aws/
+/.codex/
+/.bundle/
+/vendor/bundle/
+/log/*
+!/log/.keep
+/tmp/*
+!/tmp/.keep
+/config/master.key
+.env
+.env.*

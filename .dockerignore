@@ -1,0 +1,10 @@
+.git
+.idea
+.agents
+.aws
+.codex
+.env*
+config/master.key
+log/*
+tmp/*
+vendor/bundle
