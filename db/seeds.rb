@@ -1,3 +1,6 @@
+# Tests create their own records. db:prepare also loads seeds on a fresh database.
+return if Rails.env.test?
+
 # Entirely fictional instruments and prices, expressed in EUR.
 catalog = [
   [ "FR0000000001", "ETF fictif de démonstration", "etf", "100.00" ],
